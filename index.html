@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>XtremeTech — PainXD Website Editor</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='15' fill='%2308090c'/%3E%3Crect x='27' y='2' width='10' height='60' rx='4' fill='%238b6bff' transform='rotate(45 32 32)'/%3E%3Crect x='27' y='2' width='10' height='60' rx='4' fill='%23c8ff4d' fill-opacity='0.92' transform='rotate(-45 32 32)'/%3E%3C/svg%3E">
+
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/dialog/dialog.min.css">
+
+<style>
+  :root{
+    --void:#08090c;
+    --panel:#111319;
+    --panel-2:#161923;
+    --elevated:#1b1f2b;
+    --border:#262b38;
+    --border-soft:#1d212b;
+    --text:#e7e9f1;
+    --text-dim:#868da0;
+    --text-faint:#565d70;
+    --violet:#8b6bff;
+    --violet-dim:#5b46a8;
+    --lime:#c8ff4d;
+    --lime-dim:#8fb52f;
+    --danger:#ff5577;
+    --amber:#ffb02e;
+    --mono: 'JetBrains Mono', 'Fira Code', monospace;
+    --sans: 'Space Grotesk', sans-serif;
+  }
+  *{ box-sizing:border-box; }
+  html,body{
+    margin:0; padding:0; height:100%;
+    background:var(--void); color:var(--text);
+    font-family:var(--sans);
+    overflow:hidden;
+  }
+  ::selection{ background:var(--violet-dim); color:#fff; }
+  ::-webkit-scrollbar{ width:10px; height:10px; }
+  ::-webkit-scrollbar-track{ background:var(--panel); }
+  ::-webkit-scrollbar-thumb{ background:#2c3142; border-radius:6px; }
+  ::-webkit-scrollbar-thumb:hover{ background:#3a4058; }
+
+  .app{ display:flex; flex-direction:column; height:100vh; }
+
+  /* ---------- Header ---------- */
+  header.topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:10px 18px;
+    background:linear-gradient(180deg, var(--panel-2), var(--panel));
+    border-bottom:1px solid var(--border);
+    flex-shrink:0;
+    gap:16px;
+    flex-wrap:wrap;
+  }
+  .brand{ display:flex; align-items:center; gap:10px; }
+  .brand .mark{
+    width:34px; height:34px; flex-shrink:0;
+    border-radius:9px;
+    background:#0c0e14;
+    border:1px solid var(--border-soft);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .brand .mark svg{ width:22px; height:22px; display:block; }
+  .brand-text{ line-height:1.15; }
+  .brand-text .t1{ font-weight:700; font-size:15px; letter-spacing:0.2px; }
+  .brand-text .t2{ font-size:11px; color:var(--text-dim); font-weight:500; }
+  .brand-text .t2 b{ color:var(--lime); font-weight:600; }
+
+  .toolbar{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+
+  .proj-select-wrap{ position:relative; }
+  select.proj-select{
+    appearance:none; -webkit-appearance:none;
+    background:var(--elevated); color:var(--text);
+    border:1px solid var(--border); border-radius:7px;
+    padding:8px 30px 8px 12px;
+    font-family:var(--sans); font-size:13px; font-weight:500;
+    cursor:pointer; min-width:150px;
+    outline:none;
+  }
+  select.proj-select:focus{ border-color:var(--violet); }
+  .proj-select-wrap::after{
+    content:"⌄"; position:absolute; right:11px; top:50%; transform:translateY(-55%);
+    color:var(--text-dim); pointer-events:none; font-size:13px;
+  }
+
+  button{
+    font-family:var(--sans); font-size:13px; font-weight:600;
+    border-radius:7px; border:1px solid var(--border);
+    background:var(--elevated); color:var(--text);
+    padding:8px 13px; cursor:pointer;
+    display:inline-flex; align-items:center; gap:6px;
+    transition:border-color .15s ease, transform .1s ease;
+  }
+  button:hover{ border-color:#3a4058; }
+  button:active{ transform:translateY(1px); }
+  button.primary{
+    background:var(--violet); border-color:var(--violet); color:#fff;
+  }
+  button.primary:hover{ background:#7a58f5; }
+  button.run{
+    background:var(--lime); border-color:var(--lime); color:#0a0c06;
+  }
+  button.run:hover{ background:#d3ff6b; }
+  button.ghost{ background:transparent; }
+  button.danger:hover{ border-color:var(--danger); color:var(--danger); }
+  button.icon-only{ padding:8px 10px; }
+  button:disabled{ opacity:.4; cursor:not-allowed; }
+
+  .toggle{
+    display:flex; align-items:center; gap:7px;
+    font-size:12px; color:var(--text-dim); font-weight:600;
+    padding:0 4px; user-select:none; cursor:pointer;
+  }
+  .switch{
+    width:32px; height:18px; border-radius:99px;
+    background:#2a3040; border:1px solid var(--border);
+    position:relative; transition:background .15s ease;
+  }
+  .switch::after{
+    content:""; position:absolute; width:12px; height:12px; border-radius:50%;
+    background:var(--text-faint); top:2px; left:2px; transition:.15s ease;
+  }
+  .switch.on{ background:rgba(200,255,77,0.18); border-color:var(--lime-dim); }
+  .switch.on::after{ background:var(--lime); left:16px; }
+
+  /* ---------- Main split ---------- */
+  main.split{
+    flex:1; display:flex; min-height:0; position:relative;
+  }
+  .pane{ display:flex; flex-direction:column; min-width:0; min-height:0; }
+  .pane-editor{ flex:1 1 50%; }
+  .pane-preview{ flex:1 1 50%; }
+
+  .pane-head{
+    display:flex; align-items:center; justify-content:space-between;
+    background:var(--panel); border-bottom:1px solid var(--border);
+    flex-shrink:0; padding:0 6px;
+  }
+  .tabs{ display:flex; gap:2px; }
+  .tab{
+    padding:10px 16px 9px; font-family:var(--mono); font-size:12.5px; font-weight:500;
+    color:var(--text-dim); cursor:pointer; border-bottom:2px solid transparent;
+    letter-spacing:0.3px;
+  }
+  .tab:hover{ color:var(--text); }
+  .tab.active{ color:var(--lime); border-bottom-color:var(--lime); }
+  .tab .dot{ display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:7px; }
+  .tab[data-lang="html"] .dot{ background:var(--violet); }
+  .tab[data-lang="css"] .dot{ background:#4fc3f7; }
+  .tab[data-lang="js"] .dot{ background:var(--amber); }
+
+  .pane-title{
+    font-family:var(--mono); font-size:11px; color:var(--text-faint);
+    letter-spacing:0.5px; padding:0 10px; text-transform:uppercase;
+  }
+
+  .editor-body{ flex:1; min-height:0; }
+  .CodeMirror{
+    height:100%; background:var(--void) !important; color:var(--text) !important;
+    font-family:var(--mono) !important; font-size:13px; line-height:1.6;
+    padding-top:6px;
+  }
+  .CodeMirror-gutters{ background:var(--void) !important; border-right:1px solid var(--border-soft) !important; }
+  .CodeMirror-linenumber{ color:var(--text-faint) !important; }
+  .CodeMirror-cursor{ border-left:2px solid var(--lime) !important; }
+  .CodeMirror-activeline-background{ background:rgba(139,107,255,0.06) !important; }
+  .CodeMirror-selected{ background:rgba(139,107,255,0.25) !important; }
+  .cm-s-default .cm-tag{ color:#ff9ecb !important; }
+  .cm-s-default .cm-attribute{ color:#8fd0ff !important; }
+  .cm-s-default .cm-string{ color:var(--lime) !important; }
+  .cm-s-default .cm-comment{ color:var(--text-faint) !important; font-style:italic; }
+  .cm-s-default .cm-keyword{ color:var(--violet) !important; }
+  .cm-s-default .cm-property{ color:#8fd0ff !important; }
+  .cm-s-default .cm-variable, .cm-s-default .cm-variable-2{ color:var(--text) !important; }
+  .cm-s-default .cm-number{ color:var(--amber) !important; }
+  .cm-s-default .cm-atom{ color:var(--amber) !important; }
+  .cm-s-default .cm-def{ color:#8fd0ff !important; }
+  .cm-s-default .cm-bracket{ color:var(--text-dim) !important; }
+  .cm-s-default .cm-meta{ color:var(--text-dim) !important; }
+  .cm-s-default .cm-qualifier{ color:#ff9ecb !important; }
+
+  .divider{
+    width:5px; flex-shrink:0; cursor:col-resize; background:var(--border);
+    position:relative;
+  }
+  .divider:hover, .divider.active{ background:var(--violet); }
+
+  .preview-frame-wrap{ flex:1; min-height:0; background:#fff; position:relative; }
+  iframe#preview{ width:100%; height:100%; border:0; display:block; background:#fff; }
+
+  .console{
+    flex-shrink:0; background:#0c0e13; border-top:1px solid var(--border);
+    font-family:var(--mono); font-size:11.5px; color:var(--text-dim);
+    overflow-y:auto; transition:height .15s ease;
+  }
+  .console-row{ padding:5px 12px; border-bottom:1px solid var(--border-soft); white-space:pre-wrap; word-break:break-word; }
+  .console-row.err{ color:var(--danger); }
+  .console-row.warn{ color:var(--amber); }
+  .console-row.log{ color:#9fd9ff; }
+  .console-empty{ padding:10px 12px; color:var(--text-faint); font-style:italic; }
+
+  /* ---------- Status bar ---------- */
+  footer.statusbar{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:6px 16px; background:var(--panel); border-top:1px solid var(--border);
+    font-family:var(--mono); font-size:11px; color:var(--text-faint);
+    flex-shrink:0;
+  }
+  .status-left{ display:flex; align-items:center; gap:16px; }
+  .status-dot{ width:7px; height:7px; border-radius:50%; background:var(--lime); display:inline-block; margin-right:6px; box-shadow:0 0 6px var(--lime); }
+  .status-dot.saving{ background:var(--amber); box-shadow:0 0 6px var(--amber); }
+
+  /* ---------- Modal ---------- */
+  .overlay{
+    position:fixed; inset:0; background:rgba(4,5,8,0.7); backdrop-filter:blur(2px);
+    display:flex; align-items:center; justify-content:center; z-index:50;
+  }
+  .modal{
+    background:var(--panel-2); border:1px solid var(--border); border-radius:12px;
+    padding:22px; width:340px;
+  }
+  .modal h3{ margin:0 0 14px; font-size:15px; font-weight:700; }
+  .modal input{
+    width:100%; padding:10px 12px; border-radius:7px; border:1px solid var(--border);
+    background:var(--void); color:var(--text); font-family:var(--sans); font-size:13px;
+    outline:none; margin-bottom:16px;
+  }
+  .modal input:focus{ border-color:var(--violet); }
+  .modal-actions{ display:flex; justify-content:flex-end; gap:8px; }
+  .hidden{ display:none !important; }
+
+  @media (max-width: 760px){
+    main.split{ flex-direction:column; }
+    .divider{ display:none; }
+    .pane{ flex:1 1 50% !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="mark">
+        <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="xGradA" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#a389ff"/>
+              <stop offset="100%" stop-color="#6a4fe0"/>
+            </linearGradient>
+            <linearGradient id="xGradB" x1="1" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#e2ff9c"/>
+              <stop offset="100%" stop-color="#a3d92e"/>
+            </linearGradient>
+          </defs>
+          <rect x="27" y="2" width="10" height="60" rx="4" fill="url(#xGradA)" transform="rotate(45 32 32)"/>
+          <rect x="27" y="2" width="10" height="60" rx="4" fill="url(#xGradB)" fill-opacity="0.94" transform="rotate(-45 32 32)"/>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <div class="t1">XtremeTech</div>
+        <div class="t2"><b>PainXD</b> Website Editor</div>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <div class="proj-select-wrap">
+        <select class="proj-select" id="projectSelect"></select>
+      </div>
+      <button id="btnNew" title="New project">＋ New</button>
+      <button id="btnRename" class="ghost" title="Rename project">Rename</button>
+      <button id="btnDelete" class="ghost danger" title="Delete project">Delete</button>
+
+      <span style="width:1px;height:22px;background:var(--border);margin:0 4px;"></span>
+
+      <label class="toggle" id="liveToggleWrap">
+        <span class="switch on" id="liveSwitch"></span> Live
+      </label>
+      <button id="btnRun" class="run" title="Run now">▶ Run</button>
+      <button id="btnPaste" class="ghost" title="Paste code from clipboard">📋 Paste</button>
+    </div>
+  </header>
+
+  <main class="split" id="split">
+    <section class="pane pane-editor" id="paneEditor">
+      <div class="pane-head">
+        <div class="tabs">
+          <div class="tab active" data-lang="html"><span class="dot"></span>index.html</div>
+          <div class="tab" data-lang="css"><span class="dot"></span>style.css</div>
+          <div class="tab" data-lang="js"><span class="dot"></span>script.js</div>
+        </div>
+      </div>
+      <div class="editor-body" id="editorHost"></div>
+    </section>
+
+    <div class="divider" id="divider"></div>
+
+    <section class="pane pane-preview" id="panePreview">
+      <div class="pane-head">
+        <span class="pane-title">Live Preview</span>
+        <button class="ghost icon-only" id="btnClearConsole" title="Clear console">Clear ⌫</button>
+      </div>
+      <div class="preview-frame-wrap">
+        <iframe id="preview" title="preview" sandbox="allow-scripts allow-forms allow-modals allow-popups allow-same-origin"></iframe>
+      </div>
+      <div class="console" id="consolePanel" style="height:110px;">
+        <div class="console-empty">Console output will appear here…</div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="statusbar">
+    <div class="status-left">
+      <span><span class="status-dot" id="statusDot"></span><span id="statusText">Ready</span></span>
+      <span id="projMeta"></span>
+    </div>
+    <span>XtremeTech Editor v1.0</span>
+  </footer>
+</div>
+
+<div class="overlay hidden" id="modalOverlay">
+  <div class="modal">
+    <h3 id="modalTitle">New project</h3>
+    <input type="text" id="modalInput" maxlength="60" placeholder="Project name">
+    <div class="modal-actions">
+      <button class="ghost" id="modalCancel">Cancel</button>
+      <button class="primary" id="modalConfirm">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/xml/xml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/css/css.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/htmlmixed/htmlmixed.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closebrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/selection/active-line.min.js"></script>
+
+<script>
+(function(){
+
+  /* ============ Defaults ============ */
+  const DEFAULTS = {
+    html: `<!-- Welcome to PainXD Website Editor -->
+<div class="hero">
+  <h1>XTREME<span>TECH</span></h1>
+  <p>Edit HTML, CSS &amp; JS. Watch it render live &rarr;</p>
+  <button id="hitme">Hit me</button>
+</div>`,
+    css: `body{
+  margin:0; height:100vh; display:flex; align-items:center; justify-content:center;
+  background:radial-gradient(circle at 30% 20%, #1b1030, #05050a);
+  font-family:sans-serif; color:#fff; text-align:center;
+}
+.hero h1{
+  font-size:48px; letter-spacing:2px; margin:0;
+}
+.hero h1 span{ color:#c8ff4d; }
+.hero p{ color:#9aa; margin:10px 0 24px; }
+button{
+  padding:12px 22px; border:none; border-radius:8px; cursor:pointer;
+  background:#8b6bff; color:#fff; font-weight:700; font-size:14px;
+}
+button:hover{ background:#a389ff; }`,
+    js: `document.getElementById('hitme').addEventListener('click', () => {
+  console.log('Button hit at', new Date().toLocaleTimeString());
+  document.body.style.background = '#' + Math.floor(Math.random()*16777215).toString(16);
+});`
+  };
+
+  const STORAGE_KEY = 'ptx:projects';
+  const ACTIVE_KEY = 'ptx:activeId';
+
+  let projects = [];
+  let activeId = null;
+  let saveTimer = null;
+  let runTimer = null;
+  let isLive = true;
+  let modalMode = null; // 'new' | 'rename'
+
+  /* ============ Storage helpers ============ */
+  async function loadProjects(){
+    try{
+      const res = await window.storage.get(STORAGE_KEY, false);
+      if(res && res.value) return JSON.parse(res.value);
+    }catch(e){ /* key doesn't exist yet */ }
+    return null;
+  }
+  async function persistProjects(){
+    try{
+      await window.storage.set(STORAGE_KEY, JSON.stringify(projects), false);
+    }catch(e){ console.warn('storage set failed', e); }
+  }
+  async function persistActiveId(){
+    try{
+      await window.storage.set(ACTIVE_KEY, activeId, false);
+    }catch(e){ /* ignore */ }
+  }
+  async function loadActiveId(){
+    try{
+      const res = await window.storage.get(ACTIVE_KEY, false);
+      if(res && res.value) return res.value;
+    }catch(e){ /* none yet */ }
+    return null;
+  }
+
+  function newProject(name){
+    return {
+      id: 'p_' + Date.now().toString(36) + Math.random().toString(36).slice(2,7),
+      name: name || 'Untitled Project',
+      html: DEFAULTS.html, css: DEFAULTS.css, js: DEFAULTS.js,
+      updated: Date.now()
+    };
+  }
+
+  function getActive(){
+    return projects.find(p => p.id === activeId) || projects[0];
+  }
+
+  /* ============ CodeMirror setup ============ */
+  const editorHost = document.getElementById('editorHost');
+  const modes = {
+    html: 'htmlmixed',
+    css: 'css',
+    js: 'javascript'
+  };
+  let currentLang = 'html';
+  const cm = CodeMirror(editorHost, {
+    value: '',
+    mode: modes.html,
+    lineNumbers: true,
+    theme: 'default',
+    tabSize: 2,
+    indentUnit: 2,
+    autoCloseBrackets: true,
+    matchBrackets: true,
+    styleActiveLine: true,
+    lineWrapping: false,
+  });
+
+  cm.on('change', () => {
+    const active = getActive();
+    if(!active) return;
+    active[currentLang] = cm.getValue();
+    active.updated = Date.now();
+    scheduleSave();
+    if(isLive) scheduleRun();
+  });
+
+  /* Reliability fixes: CodeMirror can end up with stale internal
+     measurements if it's laid out before fonts/flex sizing settle,
+     which makes it look like typing doesn't register. Force refreshes
+     at the right moments and add a click-to-focus safety net. */
+  function refreshEditor(){ cm.refresh(); }
+  setTimeout(refreshEditor, 60);
+  setTimeout(refreshEditor, 400);
+  if(document.fonts && document.fonts.ready){
+    document.fonts.ready.then(refreshEditor);
+  }
+  window.addEventListener('resize', refreshEditor);
+  if(window.ResizeObserver){
+    new ResizeObserver(refreshEditor).observe(editorHost);
+  }
+  editorHost.addEventListener('mousedown', () => { setTimeout(() => cm.focus(), 0); });
+
+  function switchTab(lang){
+    currentLang = lang;
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.lang === lang));
+    const active = getActive();
+    cm.setOption('mode', modes[lang]);
+    cm.setValue(active ? active[lang] : '');
+    cm.focus();
+  }
+
+  document.querySelectorAll('.tab').forEach(t => {
+    t.addEventListener('click', () => switchTab(t.dataset.lang));
+  });
+
+  /* ============ Preview / console ============ */
+  const preview = document.getElementById('preview');
+  const consolePanel = document.getElementById('consolePanel');
+
+  function buildDoc(p){
+    const consoleBridge = `
+      <script>
+        function __send(kind, args){
+          try{
+            parent.postMessage({__ptxConsole:true, kind, text: Array.from(args).map(a=>{
+              try{ return typeof a === 'object' ? JSON.stringify(a) : String(a); }catch(e){ return String(a); }
+            }).join(' ')}, '*');
+          }catch(e){}
+        }
+        ['log','warn','error','info'].forEach(function(k){
+          const orig = console[k];
+          console[k] = function(){ __send(k, arguments); orig.apply(console, arguments); };
+        });
+        window.addEventListener('error', function(e){
+          __send('error', [e.message + ' (' + (e.filename||'') + ':' + (e.lineno||0) + ')']);
+        });
+      <\/script>`;
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8">${consoleBridge}<style>${p.css}</style></head><body>${p.html}<script>${p.js}<\/script></body></html>`;
+  }
+
+  function runPreview(){
+    const active = getActive();
+    if(!active) return;
+    preview.srcdoc = buildDoc(active);
+    flashStatus('Ready');
+  }
+
+  function scheduleRun(){
+    clearTimeout(runTimer);
+    runTimer = setTimeout(runPreview, 450);
+  }
+
+  window.addEventListener('message', (e) => {
+    if(!e.data || !e.data.__ptxConsole) return;
+    const emptyMsg = consolePanel.querySelector('.console-empty');
+    if(emptyMsg) emptyMsg.remove();
+    const row = document.createElement('div');
+    row.className = 'console-row ' + (e.data.kind === 'error' ? 'err' : e.data.kind === 'warn' ? 'warn' : 'log');
+    const time = new Date().toLocaleTimeString();
+    row.textContent = `[${time}] ${e.data.text}`;
+    consolePanel.appendChild(row);
+    consolePanel.scrollTop = consolePanel.scrollHeight;
+  });
+
+  document.getElementById('btnClearConsole').addEventListener('click', () => {
+    consolePanel.innerHTML = '<div class="console-empty">Console output will appear here…</div>';
+  });
+
+  document.getElementById('btnRun').addEventListener('click', () => { clearTimeout(runTimer); runPreview(); });
+
+  document.getElementById('btnPaste').addEventListener('click', async () => {
+    try{
+      const text = await navigator.clipboard.readText();
+      if(!text){ flashStatus('Clipboard is empty'); return; }
+      cm.replaceSelection(text);
+      cm.focus();
+      flashStatus('Pasted');
+    }catch(err){
+      flashStatus('Click the editor, then press Ctrl+V');
+      cm.focus();
+    }
+  });
+
+  const liveSwitch = document.getElementById('liveSwitch');
+  document.getElementById('liveToggleWrap').addEventListener('click', () => {
+    isLive = !isLive;
+    liveSwitch.classList.toggle('on', isLive);
+  });
+
+  /* ============ Status / save indicator ============ */
+  const statusDot = document.getElementById('statusDot');
+  const statusText = document.getElementById('statusText');
+  function flashStatus(text){
+    statusText.textContent = text;
+    statusDot.classList.remove('saving');
+  }
+  function scheduleSave(){
+    statusText.textContent = 'Saving…';
+    statusDot.classList.add('saving');
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(async () => {
+      await persistProjects();
+      updateProjMeta();
+      flashStatus('Saved');
+    }, 500);
+  }
+
+  function updateProjMeta(){
+    const active = getActive();
+    if(!active) return;
+    const d = new Date(active.updated);
+    document.getElementById('projMeta').textContent =
+      `${active.name} · updated ${d.toLocaleTimeString()}`;
+  }
+
+  /* ============ Project select / toolbar ============ */
+  const projectSelect = document.getElementById('projectSelect');
+  function renderProjectSelect(){
+    projectSelect.innerHTML = '';
+    projects.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.id; opt.textContent = p.name;
+      if(p.id === activeId) opt.selected = true;
+      projectSelect.appendChild(opt);
+    });
+  }
+  projectSelect.addEventListener('change', () => {
+    activeId = projectSelect.value;
+    persistActiveId();
+    switchTab(currentLang);
+    updateProjMeta();
+    runPreview();
+  });
+
+  /* ============ Modal ============ */
+  const overlay = document.getElementById('modalOverlay');
+  const modalTitle = document.getElementById('modalTitle');
+  const modalInput = document.getElementById('modalInput');
+
+  function openModal(mode){
+    modalMode = mode;
+    modalTitle.textContent = mode === 'new' ? 'New project' : 'Rename project';
+    modalInput.value = mode === 'rename' ? (getActive() ? getActive().name : '') : '';
+    overlay.classList.remove('hidden');
+    setTimeout(() => modalInput.focus(), 30);
+  }
+  function closeModal(){ overlay.classList.add('hidden'); modalMode = null; }
+
+  document.getElementById('btnNew').addEventListener('click', () => openModal('new'));
+  document.getElementById('btnRename').addEventListener('click', () => openModal('rename'));
+  document.getElementById('modalCancel').addEventListener('click', closeModal);
+  overlay.addEventListener('click', (e) => { if(e.target === overlay) closeModal(); });
+
+  document.getElementById('modalConfirm').addEventListener('click', async () => {
+    const val = modalInput.value.trim();
+    if(!val) return;
+    if(modalMode === 'new'){
+      const p = newProject(val);
+      projects.push(p);
+      activeId = p.id;
+      await persistProjects();
+      await persistActiveId();
+      renderProjectSelect();
+      switchTab('html');
+      updateProjMeta();
+      runPreview();
+      flashStatus('Saved');
+    } else if(modalMode === 'rename'){
+      const active = getActive();
+      if(active){
+        active.name = val;
+        active.updated = Date.now();
+        await persistProjects();
+        renderProjectSelect();
+        updateProjMeta();
+        flashStatus('Saved');
+      }
+    }
+    closeModal();
+  });
+  modalInput.addEventListener('keydown', (e) => {
+    if(e.key === 'Enter') document.getElementById('modalConfirm').click();
+    if(e.key === 'Escape') closeModal();
+  });
+
+  document.getElementById('btnDelete').addEventListener('click', async () => {
+    if(projects.length <= 1){
+      flashStatus("Can't delete your only project");
+      return;
+    }
+    const active = getActive();
+    if(!active) return;
+    if(!confirm(`Delete "${active.name}"? This can't be undone.`)) return;
+    projects = projects.filter(p => p.id !== active.id);
+    activeId = projects[0].id;
+    await persistProjects();
+    await persistActiveId();
+    renderProjectSelect();
+    switchTab(currentLang);
+    updateProjMeta();
+    runPreview();
+    flashStatus('Deleted');
+  });
+
+  /* ============ Divider drag-resize ============ */
+  const divider = document.getElementById('divider');
+  const paneEditor = document.getElementById('paneEditor');
+  const split = document.getElementById('split');
+  let dragging = false;
+  divider.addEventListener('mousedown', () => { dragging = true; divider.classList.add('active'); document.body.style.userSelect = 'none'; });
+  window.addEventListener('mouseup', () => { dragging = false; divider.classList.remove('active'); document.body.style.userSelect = ''; });
+  window.addEventListener('mousemove', (e) => {
+    if(!dragging) return;
+    const rect = split.getBoundingClientRect();
+    const pct = Math.min(80, Math.max(20, ((e.clientX - rect.left) / rect.width) * 100));
+    paneEditor.style.flex = `0 0 ${pct}%`;
+    cm.refresh();
+  });
+
+  /* ============ Keyboard shortcuts ============ */
+  window.addEventListener('keydown', (e) => {
+    if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's'){
+      e.preventDefault();
+      clearTimeout(saveTimer);
+      persistProjects().then(() => { updateProjMeta(); flashStatus('Saved'); });
+    }
+    if((e.ctrlKey || e.metaKey) && e.key === 'Enter'){
+      e.preventDefault();
+      clearTimeout(runTimer);
+      runPreview();
+    }
+  });
+
+  /* ============ Init ============ */
+  async function init(){
+    flashStatus('Loading…');
+    const loaded = await loadProjects();
+    if(loaded && Array.isArray(loaded) && loaded.length){
+      projects = loaded;
+    } else {
+      projects = [newProject('My First Site')];
+      await persistProjects();
+    }
+    const savedActive = await loadActiveId();
+    activeId = (savedActive && projects.some(p => p.id === savedActive)) ? savedActive : projects[0].id;
+    await persistActiveId();
+
+    renderProjectSelect();
+    switchTab('html');
+    updateProjMeta();
+    runPreview();
+    flashStatus('Ready');
+    setTimeout(() => { cm.refresh(); cm.focus(); }, 80);
+  }
+
+  init();
+
+})();
+</script>
+</body>
+</html>
