@@ -59,7 +59,7 @@
   .brand{ display:flex; align-items:center; gap:10px; }
   .brand .mark{
     width:34px; height:34px; flex-shrink:0;
-    border-radius:9px;
+    border-radius:99px;
     background:#0c0e14;
     border:1px solid var(--border-soft);
     display:flex; align-items:center; justify-content:center;
@@ -204,6 +204,30 @@
   .console-row.log{ color:#9fd9ff; }
   .console-empty{ padding:10px 12px; color:var(--text-faint); font-style:italic; }
 
+  /* ---------- Fullscreen Preview Overlay Clean Fix ---------- */
+  .full-preview-overlay{
+    position:fixed; inset:0; z-index:99999;
+    background:#08090c; display:flex; flex-direction:column;
+    width:100vw; height:100vh;
+  }
+  .full-preview-bar{
+    height:42px; background:var(--panel-2); border-bottom:1px solid var(--border);
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0 16px; flex-shrink:0; font-family:var(--mono); font-size:12px; color:var(--text-dim);
+  }
+  .full-preview-close{
+    background:var(--elevated); color:var(--text); border:1px solid var(--border);
+    width:28px; height:28px; border-radius:6px; font-size:14px;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer; transition:all 0.15s ease;
+  }
+  .full-preview-close:hover{
+    background:var(--danger); border-color:var(--danger); color:#fff;
+  }
+  iframe#fullPreviewFrame{
+    flex:1; width:100%; height:100%; border:0; background:#fff; display:block;
+  }
+
   /* ---------- Status bar ---------- */
   footer.statusbar{
     display:flex; align-items:center; justify-content:space-between;
@@ -274,6 +298,7 @@
         <select class="proj-select" id="projectSelect"></select>
       </div>
       <button id="btnNew" title="New project">＋ New</button>
+      <button id="btnExport" class="primary" title="Export HTML File to Storage">💾 Export File</button>
       <button id="btnRename" class="ghost" title="Rename project">Rename</button>
       <button id="btnDelete" class="ghost danger" title="Delete project">Delete</button>
 
@@ -283,6 +308,7 @@
         <span class="switch on" id="liveSwitch"></span> Live
       </label>
       <button id="btnRun" class="run" title="Run now">▶ Run</button>
+      <button id="btnFullPreview" class="primary" title="Full screen preview">⛶ Full Preview</button>
       <button id="btnPaste" class="ghost" title="Paste code from clipboard">📋 Paste</button>
     </div>
   </header>
@@ -322,6 +348,15 @@
     </div>
     <span>XtremeTech Editor v1.0</span>
   </footer>
+</div>
+
+<!-- Clean Full-Screen Website Preview Overlay -->
+<div class="full-preview-overlay hidden" id="fullPreviewOverlay">
+  <div class="full-preview-bar">
+    <span>🌐 Full Page Preview Mode (Press ESC to return)</span>
+    <button class="full-preview-close" id="btnCloseFullPreview" title="Exit Full Preview (Esc)">✕</button>
+  </div>
+  <iframe id="fullPreviewFrame" title="full preview" sandbox="allow-scripts allow-forms allow-modals allow-popups allow-same-origin"></iframe>
 </div>
 
 <div class="overlay hidden" id="modalOverlay">
@@ -389,27 +424,44 @@ button:hover{ background:#a389ff; }`,
   /* ============ Storage helpers ============ */
   async function loadProjects(){
     try{
-      const res = await window.storage.get(STORAGE_KEY, false);
-      if(res && res.value) return JSON.parse(res.value);
-    }catch(e){ /* key doesn't exist yet */ }
-    return null;
+      if(window.storage && window.storage.get){
+        const res = await window.storage.get(STORAGE_KEY, false);
+        if(res && res.value) return JSON.parse(res.value);
+      }
+    }catch(e){ /* fallback below */ }
+    
+    const local = localStorage.getItem(STORAGE_KEY);
+    return local ? JSON.parse(local) : null;
   }
+
   async function persistProjects(){
+    const data = JSON.stringify(projects);
+    localStorage.setItem(STORAGE_KEY, data);
     try{
-      await window.storage.set(STORAGE_KEY, JSON.stringify(projects), false);
+      if(window.storage && window.storage.set){
+        await window.storage.set(STORAGE_KEY, data, false);
+      }
     }catch(e){ console.warn('storage set failed', e); }
   }
+
   async function persistActiveId(){
+    if(activeId) localStorage.setItem(ACTIVE_KEY, activeId);
     try{
-      await window.storage.set(ACTIVE_KEY, activeId, false);
+      if(window.storage && window.storage.set){
+        await window.storage.set(ACTIVE_KEY, activeId, false);
+      }
     }catch(e){ /* ignore */ }
   }
+
   async function loadActiveId(){
     try{
-      const res = await window.storage.get(ACTIVE_KEY, false);
-      if(res && res.value) return res.value;
-    }catch(e){ /* none yet */ }
-    return null;
+      if(window.storage && window.storage.get){
+        const res = await window.storage.get(ACTIVE_KEY, false);
+        if(res && res.value) return res.value;
+      }
+    }catch(e){ /* fallback below */ }
+    
+    return localStorage.getItem(ACTIVE_KEY);
   }
 
   function newProject(name){
@@ -423,6 +475,45 @@ button:hover{ background:#a389ff; }`,
 
   function getActive(){
     return projects.find(p => p.id === activeId) || projects[0];
+  }
+
+  /* ============ Export File to Storage ============ */
+  function exportProjectFile(){
+    const active = getActive();
+    if(!active) return;
+
+    const fullCode = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${active.name}</title>
+  <style>
+${active.css}
+  </style>
+</head>
+<body>
+${active.html}
+  <script>
+${active.js}
+  <\/script>
+</body>
+</html>`;
+
+    const blob = new Blob([fullCode], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    
+    // Clean filename
+    const safeName = active.name.replace(/[^a-z0-0]/gi, '_').toLowerCase();
+    a.href = url;
+    a.download = `${safeName}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    flashStatus('Exported to Downloads!');
   }
 
   /* ============ CodeMirror setup ============ */
@@ -455,10 +546,6 @@ button:hover{ background:#a389ff; }`,
     if(isLive) scheduleRun();
   });
 
-  /* Reliability fixes: CodeMirror can end up with stale internal
-     measurements if it's laid out before fonts/flex sizing settle,
-     which makes it look like typing doesn't register. Force refreshes
-     at the right moments and add a click-to-focus safety net. */
   function refreshEditor(){ cm.refresh(); }
   setTimeout(refreshEditor, 60);
   setTimeout(refreshEditor, 400);
@@ -486,6 +573,8 @@ button:hover{ background:#a389ff; }`,
 
   /* ============ Preview / console ============ */
   const preview = document.getElementById('preview');
+  const fullPreviewFrame = document.getElementById('fullPreviewFrame');
+  const fullPreviewOverlay = document.getElementById('fullPreviewOverlay');
   const consolePanel = document.getElementById('consolePanel');
 
   function buildDoc(p){
@@ -512,7 +601,11 @@ button:hover{ background:#a389ff; }`,
   function runPreview(){
     const active = getActive();
     if(!active) return;
-    preview.srcdoc = buildDoc(active);
+    const doc = buildDoc(active);
+    preview.srcdoc = doc;
+    if(!fullPreviewOverlay.classList.contains('hidden')){
+      fullPreviewFrame.srcdoc = doc;
+    }
     flashStatus('Ready');
   }
 
@@ -520,6 +613,19 @@ button:hover{ background:#a389ff; }`,
     clearTimeout(runTimer);
     runTimer = setTimeout(runPreview, 450);
   }
+
+  /* Fullscreen Preview Controls */
+  document.getElementById('btnFullPreview').addEventListener('click', () => {
+    const active = getActive();
+    if(!active) return;
+    fullPreviewFrame.srcdoc = buildDoc(active);
+    fullPreviewOverlay.classList.remove('hidden');
+  });
+
+  document.getElementById('btnCloseFullPreview').addEventListener('click', () => {
+    fullPreviewOverlay.classList.add('hidden');
+    fullPreviewFrame.srcdoc = '';
+  });
 
   window.addEventListener('message', (e) => {
     if(!e.data || !e.data.__ptxConsole) return;
@@ -538,6 +644,8 @@ button:hover{ background:#a389ff; }`,
   });
 
   document.getElementById('btnRun').addEventListener('click', () => { clearTimeout(runTimer); runPreview(); });
+
+  document.getElementById('btnExport').addEventListener('click', exportProjectFile);
 
   document.getElementById('btnPaste').addEventListener('click', async () => {
     try{
@@ -573,7 +681,7 @@ button:hover{ background:#a389ff; }`,
       await persistProjects();
       updateProjMeta();
       flashStatus('Saved');
-    }, 500);
+    }, 300);
   }
 
   function updateProjMeta(){
@@ -690,16 +798,25 @@ button:hover{ background:#a389ff; }`,
 
   /* ============ Keyboard shortcuts ============ */
   window.addEventListener('keydown', (e) => {
+    if(e.key === 'Escape' && !fullPreviewOverlay.classList.contains('hidden')){
+      document.getElementById('btnCloseFullPreview').click();
+    }
     if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's'){
       e.preventDefault();
       clearTimeout(saveTimer);
       persistProjects().then(() => { updateProjMeta(); flashStatus('Saved'); });
+      exportProjectFile();
     }
     if((e.ctrlKey || e.metaKey) && e.key === 'Enter'){
       e.preventDefault();
       clearTimeout(runTimer);
       runPreview();
     }
+  });
+
+  window.addEventListener('beforeunload', () => {
+    persistProjects();
+    persistActiveId();
   });
 
   /* ============ Init ============ */
